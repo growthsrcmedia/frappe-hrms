@@ -9,14 +9,14 @@ RUN bench init --skip-redis-config-generation --skip-assets --python python3 fra
 WORKDIR /home/frappe/frappe-bench
 
 # Install erpnext
-RUN bench get-app erpnext
+RUN bench get-app erpnext --skip-assets
 
 # Copy the local hrms app into the bench
 # Note: Dokploy will have the repo content in the build context
 COPY --chown=frappe:frappe . ./apps/hrms
 
 # Install the local app
-RUN bench setup add-local-app hrms
+RUN bench get-app hrms --skip-assets
 
 # Build assets
 RUN bench build
