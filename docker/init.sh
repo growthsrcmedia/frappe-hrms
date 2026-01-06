@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Ensure logs directory exists and is writable
+mkdir -p /home/frappe/frappe-bench/logs
+
 if [ -d "/home/frappe/frappe-bench/apps/frappe" ]; then
     echo "Bench already exists, skipping init"
     cd frappe-bench
