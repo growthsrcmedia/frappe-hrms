@@ -23,9 +23,13 @@ services:
     working_dir: /home/frappe
     volumes:
       - .:/workspace
+      - frappe-sites:/home/frappe/frappe-bench/sites
+      - frappe-logs:/home/frappe/frappe-bench/logs
     ports:
-      - 8000:8000
-      - 9000:9000
+      - 8010:8000
+      - 9010:9000
 
 volumes:
   mariadb-data:
+  frappe-sites:
+  frappe-logs:
