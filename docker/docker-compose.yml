@@ -1,5 +1,4 @@
-version: "3.8"
-
+version: "3.8" # Updated version
 services:
   mariadb:
     image: mariadb:10.8
@@ -7,46 +6,26 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
       - --skip-character-set-client-handshake
-      - --skip-innodb-read-only-compressed
+      - --skip-innodb-read-only-compressed # Temporary fix for MariaDB 10.6
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-123}
+      MYSQL_ROOT_PASSWORD: 123
     volumes:
       - mariadb-data:/var/lib/mysql
 
-  redis-cache:
-    image: redis:alpine
-
-  redis-queue:
-    image: redis:alpine
-
-  redis-socketio:
+  redis:
     image: redis:alpine
 
   frappe:
-    build:
-      context: ..
-      dockerfile: Dockerfile
+    image: frappe/bench:latest
+    command: bash /workspace/init.sh
     environment:
       - SHELL=/bin/bash
-      - PRODUCTION=1
-      - DB_HOST=mariadb
-      - REDIS_CACHE=redis-cache:6379
-      - REDIS_QUEUE=redis-queue:6379
-      - REDIS_SOCKETIO=redis-socketio:6379
-      - SITE_NAME=${SITE_NAME:-hrms.localhost}
-      - DB_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-123}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+    working_dir: /home/frappe
     volumes:
-      - frappe-sites-data:/home/frappe/frappe-bench/sites
+      - .:/workspace
     ports:
       - 8010:8000
       - 9010:9000
-    depends_on:
-      - mariadb
-      - redis-cache
-      - redis-queue
-      - redis-socketio
 
 volumes:
   mariadb-data:
-  frappe-sites-data:
