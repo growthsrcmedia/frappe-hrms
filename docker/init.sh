@@ -1,46 +1,56 @@
 #!/bin/bash
 
-# Ensure logs directory exists and is writable
-mkdir -p /home/frappe/frappe-bench/logs
+# Exit on error
+set -e
 
-if [ -d "/home/frappe/frappe-bench/apps/frappe" ]; then
-    echo "Bench already exists, skipping init"
-    cd frappe-bench
-    bench start
-    exit 0
+# Use the path to the bench
+BENCH_DIR="/home/frappe/frappe-bench"
+cd "$BENCH_DIR"
+
+# Ensure common_site_config.json exists (in case sites volume is empty)
+if [ ! -f "sites/common_site_config.json" ]; then
+    echo "Initializing common_site_config.json..."
+    echo '{}' > sites/common_site_config.json
 fi
 
-echo "Creating new bench..."
+# Configure hosts (idempotent)
+echo "Configuring database and redis hosts..."
+bench set-mariadb-host "${DB_HOST:-mariadb}"
+bench set-redis-cache-host "redis://${REDIS_CACHE:-redis:6379}"
+bench set-redis-queue-host "redis://${REDIS_QUEUE:-redis:6379}"
+bench set-redis-socketio-host "redis://${REDIS_SOCKETIO:-redis:6379}"
 
-export PATH="${NVM_DIR}/versions/node/v${NODE_VERSION_DEVELOP}/bin/:${PATH}"
+# Remove redis, watch from Procfile (handled by other services/containers)
+if [ -f "./Procfile" ]; then
+    sed -i '/redis/d' ./Procfile
+    sed -i '/watch/d' ./Procfile
+fi
 
-bench init --skip-redis-config-generation frappe-bench
+# Site setup
+SITE_NAME="${SITE_NAME:-hrms.localhost}"
 
-cd frappe-bench
+if [ ! -d "sites/$SITE_NAME" ]; then
+    echo "Creating site $SITE_NAME..."
+    # Attempt to create site
+    bench new-site "$SITE_NAME" \
+        --mariadb-root-password "${DB_ROOT_PASSWORD:-123}" \
+        --admin-password "${ADMIN_PASSWORD:-admin}" \
+        --no-mariadb-socket
+    
+    echo "Installing hrms app..."
+    bench --site "$SITE_NAME" install-app hrms
+    
+    if [ "${DEVELOPER_MODE}" = "1" ]; then
+        bench --site "$SITE_NAME" set-config developer_mode 1
+    fi
+    
+    bench --site "$SITE_NAME" enable-scheduler
+else
+    echo "Site $SITE_NAME exists. Running migrations..."
+    bench --site "$SITE_NAME" migrate
+fi
 
-# Use containers instead of localhost
-bench set-mariadb-host mariadb
-bench set-redis-cache-host redis://redis:6379
-bench set-redis-queue-host redis://redis:6379
-bench set-redis-socketio-host redis://redis:6379
+bench use "$SITE_NAME"
 
-# Remove redis, watch from Procfile
-sed -i '/redis/d' ./Procfile
-sed -i '/watch/d' ./Procfile
-
-bench get-app erpnext
-bench get-app hrms
-
-bench new-site hrms.localhost \
---force \
---mariadb-root-password 123 \
---admin-password admin \
---no-mariadb-socket
-
-bench --site hrms.localhost install-app hrms
-bench --site hrms.localhost set-config developer_mode 1
-bench --site hrms.localhost enable-scheduler
-bench --site hrms.localhost clear-cache
-bench use hrms.localhost
-
+echo "Starting Bench..."
 bench start
